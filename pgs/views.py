@@ -1,35 +1,42 @@
-from django.shortcuts import redirect, render
-from django.http import Http404
-from .models import PgListing, Booking
-from users.models import MyUser
-from django.contrib.auth.decorators import login_required
-from django.utils.text import slugify
-from decimal import Decimal, InvalidOperation
-from django.shortcuts import get_object_or_404, render
-from django.contrib import messages
-from django.utils import timezone
-from datetime import timedelta
-import math
-import qrcode
 import io
-from django.core.files.base import ContentFile
+import math
 import urllib.parse
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
-# PhonePe UPI ID (Change this to your actual PhonePe UPI)
-PHONEPE_UPI = "9876543210@ybl"  # Example UPI ID
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.files.base import ContentFile
+from django.db.models import Case, IntegerField, Q, Value, When
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.utils.text import slugify
 
-# Create QR Code for PhonePe Payment
+from .models import Booking, PgListing, SavedPg, VisitRequest
+
+try:
+    import qrcode
+except ImportError:
+    qrcode = None
+
+PHONEPE_UPI = "9876543210@ybl"
+
+
 def generate_phonepe_qr_code(booking):
-    """Generate PhonePe payment QR code with UPI deep link"""
-    # PhonePe UPI format: upi://pay?pa=UPI_ID&pn=NAME&am=AMOUNT&tn=DESCRIPTION
+    if qrcode is None:
+        booking.phonepe_upi = PHONEPE_UPI
+        booking.save()
+        return booking
+
     amount_in_rupees = str(booking.amount)
-    pg_name = booking.pg.title[:20]  # Limit name length
+    pg_name = booking.pg.title[:20]
     description = f"PG Booking #{booking.id}"
-    
-    # Create UPI string
-    upi_string = f"upi://pay?pa={PHONEPE_UPI}&pn={urllib.parse.quote(pg_name)}&am={amount_in_rupees}&tn={urllib.parse.quote(description)}"
-    
-    # Generate QR code
+    upi_string = (
+        f"upi://pay?pa={PHONEPE_UPI}&pn={urllib.parse.quote(pg_name)}"
+        f"&am={amount_in_rupees}&tn={urllib.parse.quote(description)}"
+    )
+
     qr = qrcode.QRCode(
         version=2,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -38,182 +45,390 @@ def generate_phonepe_qr_code(booking):
     )
     qr.add_data(upi_string)
     qr.make(fit=True)
-    
+
     img = qr.make_image(fill_color="black", back_color="white")
-    
-    # Save QR code to file
     buffer = io.BytesIO()
-    img.save(buffer, format='PNG')
+    img.save(buffer, format="PNG")
     buffer.seek(0)
-    
+
     filename = f"qr_phonepe_{booking.id}.png"
     booking.qr_code.save(filename, ContentFile(buffer.read()), save=True)
     booking.phonepe_upi = PHONEPE_UPI
     booking.save()
-    
     return booking
 
-@login_required(login_url='user_login')
+
+def _parse_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _active_compare_ids(request):
+    ids = []
+    for raw_id in request.GET.getlist("compare"):
+        try:
+            ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    return ids[:3]
+
+
+def _filter_pgs(request, queryset=None):
+    if queryset is None:
+        queryset = PgListing.objects.all()
+    queryset = queryset.filter(owner__is_owner=True).prefetch_related("images", "owner")
+    keyword = request.GET.get("keyword", "").strip()
+    city = request.GET.get("city", "").strip()
+    min_price = request.GET.get("min_price", "").strip()
+    max_price = request.GET.get("max_price", "").strip()
+    sharing_type = request.GET.get("sharing_type", "").strip()
+    type_of_pg = request.GET.get("type_of_pg", "").strip()
+    is_available = request.GET.get("is_available", "").strip()
+    sort = request.GET.get("sort", "").strip() or "newest"
+
+    if keyword:
+        queryset = queryset.filter(
+            Q(title__icontains=keyword)
+            | Q(city__icontains=keyword)
+            | Q(state__icontains=keyword)
+            | Q(address__icontains=keyword)
+            | Q(amenities__icontains=keyword)
+        )
+    if city:
+        queryset = queryset.filter(city__iexact=city)
+    if min_price:
+        queryset = queryset.filter(price_per_month__gte=min_price)
+    if max_price:
+        queryset = queryset.filter(price_per_month__lte=max_price)
+    if sharing_type:
+        queryset = queryset.filter(sharing_type=sharing_type)
+    if type_of_pg:
+        queryset = queryset.filter(type_of_pg=type_of_pg)
+    if is_available in {"true", "false"}:
+        queryset = queryset.filter(is_available=(is_available == "true"))
+
+    if sort == "price_low_to_high":
+        queryset = queryset.order_by("price_per_month", "-created_at")
+    elif sort == "available_from":
+        queryset = queryset.order_by("available_from", "-created_at")
+    else:
+        queryset = queryset.order_by("-created_at")
+
+    active_filters = []
+    filter_map = {
+        "keyword": keyword,
+        "city": city,
+        "min_price": min_price,
+        "max_price": max_price,
+        "sharing_type": sharing_type,
+        "type_of_pg": type_of_pg,
+        "is_available": "Available only" if is_available == "true" else "",
+    }
+    for key, value in filter_map.items():
+        if value:
+            active_filters.append({"key": key, "label": f"{key.replace('_', ' ').title()}: {value}"})
+
+    return queryset, {
+        "keyword": keyword,
+        "city": city,
+        "min_price": min_price,
+        "max_price": max_price,
+        "sharing_type": sharing_type,
+        "type_of_pg": type_of_pg,
+        "is_available": is_available,
+        "sort": sort,
+        "active_filters": active_filters,
+    }
+
+
+def _listing_meta(request, listings):
+    compare_ids = _active_compare_ids(request)
+    compare_pgs = list(PgListing.objects.filter(id__in=compare_ids).prefetch_related("images"))
+    saved_pg_ids = set()
+    recent_pgs = []
+    if request.user.is_authenticated:
+        saved_pg_ids = set(
+            SavedPg.objects.filter(user=request.user, pg__in=listings).values_list("pg_id", flat=True)
+        )
+    recent_ids = request.session.get("recent_pg_ids", [])
+    if recent_ids:
+        preserved_order = Case(*[When(id=pg_id, then=Value(idx)) for idx, pg_id in enumerate(recent_ids)], output_field=IntegerField())
+        recent_pgs = list(PgListing.objects.filter(id__in=recent_ids).order_by(preserved_order)[:4])
+
+    cities = PgListing.objects.filter(owner__is_owner=True).order_by("city").values_list("city", flat=True).distinct()
+    return {
+        "saved_pg_ids": saved_pg_ids,
+        "compare_ids": compare_ids,
+        "compare_pgs": compare_pgs,
+        "recent_pgs": recent_pgs,
+        "available_cities": [city for city in cities if city],
+        "sharing_choices": PgListing.SHARING_CHOICES,
+        "type_choices": PgListing.TYPE_CHOICES,
+        "sort_choices": [
+            ("newest", "Newest"),
+            ("price_low_to_high", "Price: Low to High"),
+            ("available_from", "Available From"),
+        ],
+    }
+
+
+@login_required(login_url="user_login")
 def pg_detail(request, pg_slug):
     try:
-        pg = PgListing.objects.get(slug=pg_slug)
-    except PgListing.DoesNotExist:
-        raise Http404('PG not found') 
-    owner = pg.owner
-    OFF_PERCENT = 37
-    price_raw = getattr(pg, 'price_per_month', 0) or 0
+        pg = PgListing.objects.prefetch_related("images", "owner").get(slug=pg_slug)
+    except PgListing.DoesNotExist as exc:
+        raise Http404("PG not found") from exc
+
+    recent_ids = request.session.get("recent_pg_ids", [])
+    recent_ids = [pg.id] + [pg_id for pg_id in recent_ids if pg_id != pg.id]
+    request.session["recent_pg_ids"] = recent_ids[:6]
+
+    off_percent = 37
+    price_raw = getattr(pg, "price_per_month", 0) or 0
     try:
         price_dec = Decimal(str(price_raw))
-        mrp_dec = price_dec / (Decimal(1) - (Decimal(OFF_PERCENT) / Decimal(100)))
+        mrp_dec = price_dec / (Decimal(1) - (Decimal(off_percent) / Decimal(100)))
         mrp = int(math.ceil(mrp_dec))
     except (InvalidOperation, TypeError, ZeroDivisionError):
-        # fallback: use price as mrp if something goes wrong
-        try:
-            mrp = int(price_raw)
-        except Exception:
-            mrp = 0
+        mrp = int(price_raw or 0)
         price_dec = Decimal(str(mrp))
 
-    show_mrp = mrp > int(price_dec)
-
-    context = {
-        'pg': pg,
-        'mrp': mrp,
-        'off': OFF_PERCENT,
-        'show_mrp': show_mrp,
-    }
-    return render(request, 'pgs/pg-specification.html', context)
-
-@login_required(login_url='user_login')
-def book_pg(request, pg_slug):
-    try:
-        pg = PgListing.objects.get(slug=pg_slug)
-    except PgListing.DoesNotExist:
-        raise Http404('PG not found')
-    
-    if request.method == 'POST':
-        check_in_date_str = request.POST.get('check_in_date')
-        visit_later = request.POST.get('visit_later', False)
-        
-        # Check if user already has a booking for this PG
-        existing_booking = Booking.objects.filter(
-            tenant=request.user,
+    saved = request.user.is_authenticated and SavedPg.objects.filter(user=request.user, pg=pg).exists()
+    existing_visit_request = None
+    if request.user.is_authenticated:
+        existing_visit_request = VisitRequest.objects.filter(
+            user=request.user,
             pg=pg,
-            status__in=['pending', 'confirmed']
+            status__in=["visit_requested", "visit_confirmed"],
         ).first()
-        
-        if existing_booking:
-            messages.error(request, 'You already have an active booking for this PG!')
-            return redirect('pg_detail', pg_slug=pg_slug)
-        
-        # Create booking
-        booking = Booking.objects.create(
-            tenant=request.user,
-            pg=pg,
-            check_in_date=timezone.now().date() if not check_in_date_str else check_in_date_str,
-            amount=pg.price_per_month,
-            visit_later=visit_later,
-            status='pending'
-        )
-        
-        # Generate PhonePe QR code
-        booking = generate_phonepe_qr_code(booking)
-        
-        messages.success(request, 'Booking created successfully!')
-        return redirect('booking_confirmation', booking_id=booking.id)
-    
-    return redirect('pg_detail', pg_slug=pg_slug)
 
-@login_required(login_url='user_login')
+    context = {
+        "pg": pg,
+        "mrp": mrp,
+        "off": off_percent,
+        "show_mrp": mrp > int(price_dec),
+        "saved": saved,
+        "existing_visit_request": existing_visit_request,
+        "today": timezone.localdate().isoformat(),
+    }
+    return render(request, "pgs/pg-specification.html", context)
+
+
+@login_required(login_url="user_login")
+def book_pg(request, pg_slug):
+    pg = get_object_or_404(PgListing, slug=pg_slug)
+    if request.method != "POST":
+        return redirect("pg_detail", pg_slug=pg_slug)
+
+    if not pg.is_available:
+        messages.error(request, "This PG is currently unavailable for booking.")
+        return redirect("pg_detail", pg_slug=pg_slug)
+
+    check_in_date = _parse_date(request.POST.get("check_in_date"))
+    if not check_in_date:
+        messages.error(request, "Please provide a valid check-in date.")
+        return redirect("pg_detail", pg_slug=pg_slug)
+
+    if check_in_date < timezone.localdate():
+        messages.error(request, "Check-in date cannot be in the past.")
+        return redirect("pg_detail", pg_slug=pg_slug)
+
+    existing_booking = Booking.objects.filter(
+        tenant=request.user,
+        pg=pg,
+        status__in=["pending", "pending_payment_review", "confirmed"],
+    ).first()
+    if existing_booking:
+        messages.error(request, "You already have an active booking for this PG.")
+        return redirect("pg_detail", pg_slug=pg_slug)
+
+    booking = Booking.objects.create(
+        tenant=request.user,
+        pg=pg,
+        check_in_date=check_in_date,
+        amount=pg.price_per_month,
+        status="pending",
+    )
+    generate_phonepe_qr_code(booking)
+    messages.success(request, "Booking created. Submit your payment proof to continue.")
+    return redirect("booking_confirmation", booking_id=booking.id)
+
+
+@login_required(login_url="user_login")
+def request_visit(request, pg_slug):
+    pg = get_object_or_404(PgListing, slug=pg_slug)
+    if request.method != "POST":
+        return redirect("pg_detail", pg_slug=pg_slug)
+
+    preferred_date = _parse_date(request.POST.get("preferred_date"))
+    notes = request.POST.get("notes", "").strip()
+    if not preferred_date or preferred_date < timezone.localdate():
+        messages.error(request, "Please choose a valid future visit date.")
+        return redirect("pg_detail", pg_slug=pg_slug)
+
+    visit_request, created = VisitRequest.objects.get_or_create(
+        user=request.user,
+        pg=pg,
+        status="visit_requested",
+        defaults={"preferred_date": preferred_date, "notes": notes},
+    )
+    if created:
+        messages.success(request, "Visit request submitted successfully.")
+    else:
+        visit_request.preferred_date = preferred_date
+        visit_request.notes = notes
+        visit_request.save(update_fields=["preferred_date", "notes"])
+        messages.info(request, "Your existing visit request was updated.")
+    return redirect("pg_detail", pg_slug=pg_slug)
+
+
+@login_required(login_url="user_login")
+def toggle_saved_pg(request, pg_slug):
+    pg = get_object_or_404(PgListing, slug=pg_slug)
+    if request.method != "POST":
+        return redirect("pg_detail", pg_slug=pg_slug)
+
+    saved_pg = SavedPg.objects.filter(user=request.user, pg=pg).first()
+    if saved_pg:
+        saved_pg.delete()
+        messages.info(request, "PG removed from your saved list.")
+    else:
+        SavedPg.objects.create(user=request.user, pg=pg)
+        messages.success(request, "PG added to your saved list.")
+    next_url = request.POST.get("next")
+    if next_url:
+        return redirect(next_url)
+    return redirect("pg_detail", pg_slug=pg.slug)
+
+
+@login_required(login_url="user_login")
+def saved_pg_list(request):
+    saved_items = SavedPg.objects.filter(user=request.user).select_related("pg", "pg__owner").prefetch_related("pg__images")
+    return render(request, "pgs/saved_pgs.html", {"saved_items": saved_items})
+
+
+@login_required(login_url="user_login")
 def booking_confirmation(request, booking_id):
-    booking = get_object_or_404(Booking, id=booking_id, tenant=request.user)
-    
-    context = {
-        'booking': booking,
-        'pg': booking.pg,
-        'qr_code_url': booking.qr_code.url if booking.qr_code else None,
-    }
-    return render(request, 'pgs/booking_confirmation.html', context)
+    booking = get_object_or_404(Booking.objects.select_related("pg", "tenant"), id=booking_id, tenant=request.user)
+    timeline = [
+        {"key": "pending", "label": "Booking Created"},
+        {"key": "pending_payment_review", "label": "Payment Proof Submitted"},
+        {"key": "confirmed", "label": "Booking Confirmed"},
+        {"key": "completed", "label": "Completed"},
+    ]
+    current_index = next(
+        (index for index, item in enumerate(timeline) if item["key"] == booking.status),
+        0,
+    )
+    for index, item in enumerate(timeline):
+        item["done"] = index <= current_index
 
-@login_required(login_url='user_login')
+    context = {
+        "booking": booking,
+        "pg": booking.pg,
+        "qr_code_url": booking.qr_code.url if booking.qr_code else None,
+        "timeline": timeline,
+    }
+    return render(request, "pgs/booking_confirmation.html", context)
+
+
+@login_required(login_url="user_login")
 def confirm_payment(request, booking_id):
-    """Mark booking as confirmed after payment"""
     booking = get_object_or_404(Booking, id=booking_id, tenant=request.user)
-    
-    if request.method == 'POST':
-        booking.status = 'confirmed'
-        booking.payment_confirmed_date = timezone.now()
+    if request.method == "POST":
+        payment_reference = request.POST.get("payment_reference", "").strip()
+        screenshot = request.FILES.get("payment_screenshot")
+        if not payment_reference:
+            messages.error(request, "Transaction ID or payment reference is required.")
+            return redirect("confirm_payment", booking_id=booking.id)
+        booking.payment_reference = payment_reference
+        booking.payment_id = payment_reference
+        if screenshot:
+            booking.payment_screenshot = screenshot
+        booking.status = "pending_payment_review"
         booking.save()
-        messages.success(request, 'Payment confirmed! Your booking is now active.')
-        return redirect('my_bookings_list')
-    
-    return render(request, 'pgs/confirm_payment.html', {'booking': booking})
+        messages.success(request, "Payment proof submitted. We will review it soon.")
+        return redirect("booking_confirmation", booking_id=booking.id)
 
-@login_required(login_url='user_login')
+    return render(request, "pgs/confirm_payment.html", {"booking": booking})
+
+
+@login_required(login_url="user_login")
 def my_bookings_list(request):
-    bookings = Booking.objects.filter(tenant=request.user).order_by('-booking_date')
-    
-    context = {
-        'bookings': bookings,
-    }
-    return render(request, 'pgs/my_bookings_list.html', context)
+    bookings = Booking.objects.filter(tenant=request.user).select_related("pg", "pg__owner").order_by("-booking_date")
+    visit_requests = VisitRequest.objects.filter(user=request.user).select_related("pg").order_by("-created_at")
+    return render(
+        request,
+        "pgs/my_bookings_list.html",
+        {
+            "bookings": bookings,
+            "visit_requests": visit_requests,
+        },
+    )
+
 
 def search(request):
-    query = request.GET.get('keyword')
-    if query:
-        pgs = PgListing.objects.filter(owner__is_owner=True).filter(title__icontains=query) | PgListing.objects.filter(owner__is_owner=True).filter(city__icontains=query) | PgListing.objects.filter(owner__is_owner=True).filter(state__icontains=query)
-    else:
-        pgs = PgListing.objects.none()
+    listings, filters = _filter_pgs(request)
     context = {
-        'pgs': pgs,
-        # 'query': query
+        "pgs": listings,
+        "filters": filters,
+        "search_mode": True,
     }
-    return render(request, 'pgs/pgs.html', context)
+    context.update(_listing_meta(request, listings))
+    return render(request, "pgs/pgs.html", context)
 
 
 def pgs(request):
-    pgs = PgListing.objects.filter(owner__is_owner=True)
+    listings, filters = _filter_pgs(request, PgListing.objects.all())
     context = {
-        'pgs': pgs
+        "pgs": listings,
+        "filters": filters,
+        "search_mode": False,
     }
-    return render(request, 'pgs/pgs.html', context)
+    context.update(_listing_meta(request, listings))
+    return render(request, "pgs/pgs.html", context)
+
 
 def about(request):
     return render(request, "about.html")
 
 
-
-@login_required(login_url='user_login') 
+@login_required(login_url="user_login")
 def pg_register(request):
     if not request.user.is_owner:
-        return redirect('home')  
-    if request.method == 'POST':
-        title = request.POST.get('title')
-        description = request.POST.get('description')
-        address = request.POST.get('address')
-        city = request.POST.get('city')
-        state = request.POST.get('state')
-        pin_code = request.POST.get('pin_code')
-        price_per_month = request.POST.get('price_per_month')
-        available_from = request.POST.get('available_from')
-        type_of_pg = request.POST.get('type_of_pg')
-        amenities = request.POST.get('amenities')
-        sharing_type = request.POST.get('sharing_type')
-        pg_images = request.FILES.getlist('pg_images')
-        
-        owner = request.user 
+        return redirect("home")
+
+    if request.method == "POST":
+        title = request.POST.get("title")
+        description = request.POST.get("description")
+        address = request.POST.get("address")
+        city = request.POST.get("city")
+        state = request.POST.get("state")
+        pin_code = request.POST.get("pin_code")
+        price_per_month = request.POST.get("price_per_month")
+        security_deposit = request.POST.get("security_deposit") or 0
+        available_from = request.POST.get("available_from")
+        type_of_pg = request.POST.get("type_of_pg")
+        amenities = request.POST.get("amenities")
+        preferred_tenants = request.POST.get("preferred_tenants")
+        furnishing_status = request.POST.get("furnishing_status") or "fully_furnished"
+        sharing_type = request.POST.get("sharing_type")
+        rules_or_restrictions = request.POST.get("rules_or_restrictions", "")
+        pg_images = request.FILES.getlist("pg_images")
 
         slug = slugify(title)
-        # Ensure slug is unique
         base_slug = slug
         counter = 1
         while PgListing.objects.filter(slug=slug).exists():
             slug = f"{base_slug}-{counter}"
             counter += 1
-            
-        # Create a new PgListing instance
+
         pg_listing = PgListing.objects.create(
-            owner=owner,
+            owner=request.user,
             title=title,
             slug=slug,
             description=description,
@@ -222,31 +437,103 @@ def pg_register(request):
             state=state,
             pin_code=pin_code,
             price_per_month=price_per_month,
+            security_deposit=security_deposit,
             available_from=available_from,
             type_of_pg=type_of_pg,
             amenities=amenities,
-            sharing_type=sharing_type
+            preferred_tenants=preferred_tenants,
+            furnishing_status=furnishing_status,
+            food_available=bool(request.POST.get("food_available")),
+            parking_available=bool(request.POST.get("parking_available")),
+            wifi_available=bool(request.POST.get("wifi_available")),
+            rules_or_restrictions=rules_or_restrictions,
+            sharing_type=sharing_type,
+            is_available=request.POST.get("is_available") == "1",
         )
-        # Save the images
+
         for image in pg_images:
             pg_listing.images.create(pg_image=image)
-        
-        return redirect('pgs')  # Redirect to a success page or the PG listing page
-    else:   
-        return render(request, 'users/owners/pgregister.html')
+
+        messages.success(request, "PG listing created successfully.")
+        return redirect("pgs")
+    return render(request, "users/owners/pgregister.html")
 
 
-@login_required(login_url='user_login')
+@login_required(login_url="user_login")
 def cancel_booking(request, booking_id):
-    """Cancel a booking (marks status as 'cancelled')."""
     booking = get_object_or_404(Booking, id=booking_id, tenant=request.user)
-    if request.method == 'POST':
-        if booking.status == 'cancelled':
-            messages.info(request, 'Booking already cancelled.')
+    if request.method == "POST":
+        if booking.status == "cancelled":
+            messages.info(request, "Booking already cancelled.")
+        elif booking.status == "completed":
+            messages.error(request, "Completed bookings cannot be cancelled.")
         else:
-            booking.status = 'cancelled'
-            booking.save()
-            messages.success(request, 'Booking cancelled successfully.')
-    return redirect('my_bookings_list')
-    
+            booking.status = "cancelled"
+            booking.save(update_fields=["status", "updated_at"])
+            messages.success(request, "Booking cancelled successfully.")
+    return redirect("my_bookings_list")
 
+
+@login_required(login_url="user_login")
+def compare_pgs(request):
+    compare_ids = _active_compare_ids(request)
+    compare_pgs = PgListing.objects.filter(id__in=compare_ids).prefetch_related("images")[:3]
+    return render(request, "pgs/compare.html", {"compare_pgs": compare_pgs})
+
+
+@login_required(login_url="user_login")
+def owner_booking_reviews(request):
+    if not (request.user.is_owner or request.user.is_staff):
+        messages.error(request, "You do not have access to booking reviews.")
+        return redirect("home")
+
+    filters = Q(pg__owner=request.user) if request.user.is_owner and not request.user.is_staff else Q()
+    bookings = Booking.objects.filter(filters).select_related("tenant", "pg", "reviewed_by")
+    visit_requests = VisitRequest.objects.filter(filters).select_related("user", "pg")
+    return render(
+        request,
+        "pgs/owner_booking_reviews.html",
+        {"bookings": bookings, "visit_requests": visit_requests},
+    )
+
+
+@login_required(login_url="user_login")
+def review_booking(request, booking_id):
+    booking = get_object_or_404(Booking.objects.select_related("pg"), id=booking_id)
+    if not (request.user.is_staff or booking.pg.owner_id == request.user.id):
+        messages.error(request, "You do not have access to this booking.")
+        return redirect("home")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        booking.review_notes = request.POST.get("review_notes", "").strip()
+        booking.reviewed_by = request.user
+        if action == "approve":
+            booking.status = "confirmed"
+            booking.payment_confirmed_date = timezone.now()
+            messages.success(request, "Booking marked as confirmed.")
+        elif action == "reject":
+            booking.status = "pending"
+            booking.payment_confirmed_date = None
+            messages.info(request, "Booking moved back to pending payment.")
+        booking.save()
+    return redirect("owner_booking_reviews")
+
+
+@login_required(login_url="user_login")
+def review_visit_request(request, visit_request_id):
+    visit_request = get_object_or_404(VisitRequest.objects.select_related("pg"), id=visit_request_id)
+    if not (request.user.is_staff or visit_request.pg.owner_id == request.user.id):
+        messages.error(request, "You do not have access to this visit request.")
+        return redirect("home")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "confirm":
+            visit_request.status = "visit_confirmed"
+            messages.success(request, "Visit request confirmed.")
+        elif action == "cancel":
+            visit_request.status = "cancelled"
+            messages.info(request, "Visit request cancelled.")
+        visit_request.save(update_fields=["status"])
+    return redirect("owner_booking_reviews")

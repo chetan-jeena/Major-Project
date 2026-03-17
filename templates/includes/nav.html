@@ -6,9 +6,14 @@
   <ul class="nav-links">
     {% if user.is_authenticated %}
       <li><a href="{% url 'home'%}">Home</a></li>
+      <li><a href="{% url 'pgs' %}">PGs</a></li>
       <li><a href="{% url 'about' %}">About</a></li>
       <li><a href="{% url 'contact' %}">Contact</a></li>
-      <li><a href="#">Visit</a></li>
+      <li><a href="{% url 'saved_pg_list' %}">Saved</a></li>
+      {% if user.is_owner or user.is_staff %}
+        <li><a href="{% url 'owner_dashboard' %}">Dashboard</a></li>
+        <li><a href="{% url 'owner_booking_reviews' %}">Reviews</a></li>
+      {% endif %}
       
       <!-- User Profile Section -->
       <li class="user-profile">
@@ -44,7 +49,12 @@
                 <span>My Bookings</span>
               </a>
             </li>
+            <li><a href="{% url 'saved_pg_list' %}">Saved PGs</a></li>
             <li><a href="{% url 'settings' %}">Settings</a></li>
+            {% if user.is_owner or user.is_staff %}
+              <li><a href="{% url 'owner_dashboard' %}">Owner Dashboard</a></li>
+              <li><a href="{% url 'owner_booking_reviews' %}">Owner Reviews</a></li>
+            {% endif %}
             <li><a href="{% url 'help_support' %}">Help & Support</a></li>
           </ul>
           

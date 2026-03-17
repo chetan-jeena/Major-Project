@@ -1,141 +1,150 @@
 {% extends "base.html" %}
 {% load static %}
 
-  <title>Dashboard Product Detail</title>
-  {% block newlink %}
-  <link rel="stylesheet" href="{% static 'css/pg-specification.css' %}">
-  {% endblock %}
+{% block newlink %}
+<link rel="stylesheet" href="{% static 'css/pg-specification.css' %}">
+<style>
+  .detail-shell { max-width: 1180px; margin: 0 auto; padding: 2rem 1rem 3rem; }
+  .detail-grid { display:grid; grid-template-columns: 1.1fr .9fr; gap: 1.4rem; }
+  .panel { background:white; border-radius:24px; box-shadow:0 16px 42px rgba(30,31,61,0.08); overflow:hidden; }
+  .media-panel { padding:1rem; }
+  .main-image { width:100%; height:430px; object-fit:cover; border-radius:18px; background:#eef4fb; }
+  .thumbs { display:grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap:.7rem; margin-top:.8rem; }
+  .thumbs img { width:100%; height:86px; object-fit:cover; border-radius:14px; cursor:pointer; border:2px solid transparent; }
+  .thumbs img.active-thumb { border-color:#1e88e5; }
+  .content-panel { padding:1.4rem; }
+  .badge-row, .amenity-row { display:flex; flex-wrap:wrap; gap:.55rem; margin:.8rem 0; }
+  .badge { background:#eef4fb; color:#1e1f3d; border-radius:999px; padding:.4rem .8rem; font-size:.9rem; }
+  .available { background:#e6f7ea; color:#1b7b34; }
+  .unavailable { background:#fde8e8; color:#b42318; }
+  .price-box { display:flex; flex-wrap:wrap; gap:.8rem; align-items:center; margin:1rem 0; }
+  .price-box strong { font-size:2rem; color:#1e1f3d; }
+  .muted { color:#66768a; }
+  .grid-2 { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:.8rem; margin:1rem 0; }
+  .spec { background:#f8fbff; border:1px solid #e7eef7; border-radius:16px; padding:1rem; }
+  .spec small { color:#6a7684; display:block; margin-bottom:.25rem; }
+  .action-stack { display:grid; gap:.9rem; margin-top:1rem; }
+  .action-stack form, .action-stack a { display:block; }
+  .action-stack input, .action-stack textarea, .action-stack button { width:100%; border-radius:14px; padding:.9rem 1rem; }
+  .action-stack input, .action-stack textarea { border:1px solid #d8e1eb; }
+  .action-stack button { border:none; background:#1e88e5; color:white; font-weight:700; }
+  .ghost-btn { display:inline-block; text-decoration:none; text-align:center; padding:.9rem 1rem; border-radius:14px; background:#eef4fb; color:#1e1f3d; font-weight:600; }
+  @media (max-width: 900px) { .detail-grid, .grid-2 { grid-template-columns: 1fr; } .main-image { height:300px; } }
+</style>
+{% endblock %}
+
 {% block content %}
-<!-- FIXED FILTER BAR -->
-<div class="filter-bar fixed">
-  <div class="filter-wrapper">
-
-       <!-- Search Bar -->
-       <form action="{% url 'search' %}">
-         <input type="text" name="keyword" placeholder="Search PG or Hostel..." class="search-bar" />
-       <button class="search-btn">Search</button>
-
-       </form>
-      
-    </div>
-  </div>
-  
-<!-- MAIN CONTENT -->
-<div class="main-container">
-  <div class="dashboard-card">
-    <!-- LEFT: IMAGE SECTION -->
-    <div class="card-left">
-      <div class="image-container">
-        <!-- MAIN IMAGE -->
-        <div class="main-image-wrapper">
-          {% if pg.images.all %}
-            {% for pgimg in pg.images.all %}
-              {% if forloop.first %}
-                <img id="mainProductImg" class="main-img" 
-                     src="{{ pgimg.pg_image.url }}" 
-                     alt="{{ pg.title }}">
-              {% endif %}
-            {% endfor %}
-          {% else %}
-            <img id="mainProductImg" class="main-img" 
-                 src="{% static 'images/pg-placeholder.png' %}" 
-                 alt="No image available">
-          {% endif %}
-        </div>
-        <!-- THUMBNAILS VERTICAL -->
-        <div class="thumb-column">
-          {% if pg.images.all %}
-            {% for pgimg in pg.images.all %}
-              <img src="{{ pgimg.pg_image.url }}" 
-                   data-large="{{ pgimg.pg_image.url }}" 
-                   alt="{{ pg.title }}"
-                   class="thumbnail {% if forloop.first %}active-thumb{% endif %}">
-            {% endfor %}
-          {% else %}
-            {% comment %} <img src="{% static 'images/pg-placeholder.png' }"  
-                 data-large="{% static 'images/pg-placeholder.png' }" 
-                 alt="No image available"
-                 class="thumbnail active-thumb"> {% endcomment %}
-          {% endif %}
-        </div>
+<section class="detail-shell">
+  <div class="detail-grid">
+    <section class="panel media-panel">
+      {% with pg.images.first as lead_image %}
+        {% if lead_image %}
+          <img id="mainProductImg" class="main-image" src="{{ lead_image.pg_image.url }}" alt="{{ pg.title }}">
+        {% else %}
+          <img id="mainProductImg" class="main-image" src="{% static 'images/user.png' %}" alt="{{ pg.title }}">
+        {% endif %}
+      {% endwith %}
+      <div class="thumbs">
+        {% for pgimg in pg.images.all %}
+          <img src="{{ pgimg.pg_image.url }}" data-large="{{ pgimg.pg_image.url }}" alt="{{ pg.title }}" class="{% if forloop.first %}active-thumb{% endif %}">
+        {% empty %}
+          <img src="{% static 'images/user.png' %}" alt="{{ pg.title }}" class="active-thumb">
+        {% endfor %}
       </div>
-    </div>
+    </section>
 
-        <!-- RIGHT -->
-        <div class="card-right">
-          <h1>{{ pg.title }} | {{ pg.address }} | {{pg.state}} </h1>
-          <div class="rating-row">
-            <span class="rating">4.2 ★</span>
-            <span class="rating-count">67,310 Ratings & 3,748 Reviews</span>
-          </div>
-          <hr>
-          <div class="price-row">
-            <span class="price">₹{{ pg.price_per_month }} /month</span>
-            <span class="mrp">₹{{mrp}} /month</span>
-          <span class="off">{{off}}% off</span>
-        </div>
-        <ul class="offers">
-          <li>24 X 7 Water Supply</li>
-          <li>Electricity Bill Included</li>
-          <li>Cleaning Major</li>
-          <li>Specially No Night Entry</li>
-          <li>Wifi Available As Per Requirements</li>
-        </ul>
-        <hr>
-        <div class="btn-row">
-          <form method="POST" action="{% url 'book_pg' pg_slug=pg.slug %}" style="display:inline; width: 48%;">
-            {% csrf_token %}
-            <input type="hidden" name="visit_later" value="1">
-            <button type="submit" class="btn btn-secondary" style="width:100%;">Visit Later</button>
-          </form>
-          <form method="POST" action="{% url 'book_pg' pg_slug=pg.slug %}" style="display:inline; width: 48%; margin-left: 4%;">
-            {% csrf_token %}
-            <input type="hidden" name="visit_later" value="0">
-            <button type="submit" class="btn btn-primary" style="width:100%;">Book Now</button>
-          </form>
-        </div>
-        <hr>
-        <div class="specs">
-          <h3>Specifications</h3>
-          <table>
-            <tr><td>Type</td><td>2BHK Apartment</td></tr>
-            <tr><td>Furnishing</td><td>Fully Furnished</td></tr>
-            <tr><td>Available From</td><td>Immediate</td></tr>
-            <tr><td>Lease Duration</td><td>11 Months</td></tr>
-            <tr><td>Security Deposit</td><td>₹12,498</td></tr>
-            <tr><td>Floor Number</td><td>3rd Floor</td></tr>
-            <tr><td>Total Floors in Building</td><td>5 Floors</td></tr>
-            <tr><td>Preferred Tenant</td><td>Bachelor, Family, Working Professionals, Students</td></tr>
-          </table>
-        </div>
-        <div class="specs">
-          <h3>Description</h3>
-          <p>
-{{ pg.description }}
-          </p>
-        </div>
+    <section class="panel content-panel">
+      <h1>{{ pg.title }}</h1>
+      <p class="muted">{{ pg.address }}, {{ pg.city }}, {{ pg.state }} {{ pg.pin_code }}</p>
+
+      <div class="badge-row">
+        <span class="badge {% if pg.is_available %}available{% else %}unavailable{% endif %}">
+          {% if pg.is_available %}Available now{% else %}Currently unavailable{% endif %}
+        </span>
+        <span class="badge">{{ pg.get_sharing_type_display }}</span>
+        {% if pg.type_of_pg %}<span class="badge">{{ pg.get_type_of_pg_display }}</span>{% endif %}
+        <span class="badge">{{ pg.get_furnishing_status_display }}</span>
       </div>
-    </div>
+
+      <div class="price-box">
+        <strong>₹{{ pg.price_per_month }}/month</strong>
+        {% if show_mrp %}<span class="muted"><s>₹{{ mrp }}/month</s></span>{% endif %}
+        <span class="badge">{{ off }}% off</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="spec"><small>Available from</small><strong>{{ pg.available_from|date:"d M Y" }}</strong></div>
+        <div class="spec"><small>Security deposit</small><strong>₹{{ pg.security_deposit }}</strong></div>
+        <div class="spec"><small>Wi-Fi</small><strong>{% if pg.wifi_available %}Included{% else %}Not listed{% endif %}</strong></div>
+        <div class="spec"><small>Food</small><strong>{% if pg.food_available %}Available{% else %}Not included{% endif %}</strong></div>
+        <div class="spec"><small>Parking</small><strong>{% if pg.parking_available %}Available{% else %}Not available{% endif %}</strong></div>
+        <div class="spec"><small>Preferred tenants</small><strong>{{ pg.preferred_tenants|default:"Open to all" }}</strong></div>
+      </div>
+
+      <h3>Description</h3>
+      <p class="muted">{{ pg.description }}</p>
+
+      <h3>Amenities</h3>
+      <div class="amenity-row">
+        {% for amenity in pg.amenities_list %}
+          <span class="badge">{{ amenity }}</span>
+        {% empty %}
+          <span class="muted">Amenities will be updated soon.</span>
+        {% endfor %}
+      </div>
+
+      {% if pg.rules_or_restrictions %}
+        <h3>Rules & restrictions</h3>
+        <p class="muted">{{ pg.rules_or_restrictions }}</p>
+      {% endif %}
+
+      <h3>Owner contact</h3>
+      <p class="muted">{{ pg.owner.first_name }} {{ pg.owner.last_name }} · {{ pg.owner.phone }} · {{ pg.owner.email }}</p>
+
+      <div class="action-stack">
+        <form method="post" action="{% url 'toggle_saved_pg' pg.slug %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'pg_detail' pg.slug %}">
+          <button type="submit">{% if saved %}Remove from saved PGs{% else %}Save this PG{% endif %}</button>
+        </form>
+
+        <a class="ghost-btn" href="{% url 'compare_pgs' %}?compare={{ pg.id }}">Compare this PG</a>
+        <a class="ghost-btn" href="{% url 'contact' %}">Need help deciding? Contact support</a>
+
+        {% if pg.is_available %}
+          <form method="post" action="{% url 'book_pg' pg_slug=pg.slug %}">
+            {% csrf_token %}
+            <input type="date" name="check_in_date" min="{{ today|default:'' }}" required>
+            <button type="submit">Book now</button>
+          </form>
+        {% else %}
+          <div class="spec"><small>Booking</small><strong>This PG is not accepting bookings right now.</strong></div>
+        {% endif %}
+
+        <form method="post" action="{% url 'request_visit' pg_slug=pg.slug %}">
+          {% csrf_token %}
+          <input type="date" name="preferred_date" required>
+          <textarea name="notes" rows="3" placeholder="Add any visit preference or question"></textarea>
+          <button type="submit">
+            {% if existing_visit_request %}Update visit request{% else %}Request a visit{% endif %}
+          </button>
+        </form>
+      </div>
+    </section>
   </div>
-  
-  <!-- JS THUMBNAIL -->
-  <script>
-    // Thumbnail click handler: updates main image and active thumbnail state
-    (function () {
-      const mainImg = document.getElementById('mainProductImg');
-      const thumbs = document.querySelectorAll('.thumb-column img');
-      if (!mainImg || thumbs.length === 0) return;
-      thumbs.forEach(t => {
-        t.addEventListener('click', function () {
-          const large = this.dataset.large || this.src;
-          mainImg.src = large;
-          // active class
-          thumbs.forEach(x => x.classList.remove('active-thumb'));
-          this.classList.add('active-thumb');
-        });
+</section>
+
+<script>
+  (function () {
+    const mainImg = document.getElementById("mainProductImg");
+    const thumbs = document.querySelectorAll(".thumbs img[data-large]");
+    thumbs.forEach((thumb) => {
+      thumb.addEventListener("click", function () {
+        mainImg.src = this.dataset.large || this.src;
+        thumbs.forEach((node) => node.classList.remove("active-thumb"));
+        this.classList.add("active-thumb");
       });
-    })();
-  </script>
-  
-  {% endblock %}
-
+    });
+  })();
+</script>
+{% endblock %}

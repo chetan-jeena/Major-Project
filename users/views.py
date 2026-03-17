@@ -1,10 +1,13 @@
+from urllib.parse import quote_plus
+
+from django.conf import settings
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
 from django.contrib import messages, auth
 from django.contrib.auth import logout
 
 from .models import MyUser
-from pgs.models import PgListing
+from contact.models import ContactMessage
+from pgs.models import Booking, PgListing, VisitRequest
 
 # Email imports
 from django.contrib.sites.shortcuts import get_current_site
@@ -29,7 +32,7 @@ def user_login(request):
             if user.is_owner:
                 if not PgListing.objects.filter(owner=user).exists():
                     return redirect('pg_register')
-                return HttpResponse("Owner Dashboard")
+                return redirect('owner_dashboard')
 
             return redirect('home')
 
@@ -332,11 +335,67 @@ def my_profile(request):
 def my_bookings(request):
     if not request.user.is_authenticated:
         return redirect('user_login')
+    return redirect('my_bookings_list')
 
-    # Placeholder: integrate with your booking model later
-    bookings = []
-    context = {'bookings': bookings, 'page': 'bookings'}
-    return render(request, 'users/dashboard/my_bookings.html', context)
+
+# ---------------------- OWNER DASHBOARD ---------------------------
+def owner_dashboard(request):
+    if not request.user.is_authenticated:
+        return redirect('user_login')
+    if not request.user.is_owner:
+        messages.error(request, "Owner dashboard is only available to owner accounts.")
+        return redirect('home')
+
+    owner_listings = (
+        PgListing.objects.filter(owner=request.user)
+        .prefetch_related('images', 'bookings', 'visit_requests')
+        .order_by('-created_at')
+    )
+    if not owner_listings.exists():
+        return redirect('pg_register')
+
+    selected_pg = owner_listings.first()
+    selected_slug = request.GET.get('pg')
+    if selected_slug:
+        selected_pg = owner_listings.filter(slug=selected_slug).first() or selected_pg
+
+    selected_address = ", ".join(
+        part for part in [selected_pg.address, selected_pg.city, selected_pg.state, selected_pg.pin_code] if part
+    )
+    encoded_address = quote_plus(selected_address)
+    maps_key = getattr(settings, 'GOOGLE_MAPS_EMBED_API_KEY', '')
+    if maps_key:
+        google_maps_url = (
+            "https://www.google.com/maps/embed/v1/place"
+            f"?key={maps_key}&q={encoded_address}"
+        )
+    else:
+        google_maps_url = f"https://maps.google.com/maps?q={encoded_address}&t=&z=13&ie=UTF8&iwloc=&output=embed"
+
+    owner_bookings = Booking.objects.filter(pg__owner=request.user).select_related('tenant', 'pg').order_by('-booking_date')
+    owner_visit_requests = (
+        VisitRequest.objects.filter(pg__owner=request.user)
+        .select_related('user', 'pg')
+        .order_by('-created_at')
+    )
+
+    context = {
+        'selected_pg': selected_pg,
+        'owner_listings': owner_listings,
+        'google_maps_url': google_maps_url,
+        'owner_metrics': {
+            'total_listings': owner_listings.count(),
+            'available_listings': owner_listings.filter(is_available=True).count(),
+            'pending_booking_reviews': owner_bookings.filter(status='pending_payment_review').count(),
+            'confirmed_bookings': owner_bookings.filter(status='confirmed').count(),
+            'visit_requests': owner_visit_requests.filter(status__in=['visit_requested', 'visit_confirmed']).count(),
+            'unread_contact_messages': ContactMessage.objects.filter(is_read=False).count(),
+        },
+        'recent_owner_bookings': owner_bookings[:5],
+        'recent_visit_requests': owner_visit_requests[:5],
+        'maps_key_configured': bool(maps_key),
+    }
+    return render(request, 'users/dashboard/owner_dashboard.html', context)
 
 
 # ---------------------- DASHBOARD: SETTINGS ---------------------------
@@ -383,8 +442,9 @@ def help_support(request):
         return redirect('user_login')
 
     faqs = [
-        {'q': 'How do I search for PGs?', 'a': 'Use the search bar on the home page to filter PGs by location, price range, and amenities.'},
-        {'q': 'How do I book a PG?', 'a': 'Click on a PG listing and use the contact form to reach out to the owner directly.'},
+        {'q': 'How do I search for PGs?', 'a': 'Use the search bar and filters on the home page or PG listing page to filter by location, price, sharing type, availability, and category.'},
+        {'q': 'How do I book a PG?', 'a': 'Open a PG detail page, choose a valid check-in date, create the booking, and then submit your payment reference for review.'},
+        {'q': 'Can I save PGs for later?', 'a': 'Yes, use the save button on any PG detail page to build a shortlist you can revisit later.'},
         {'q': 'Can I change my profile information?', 'a': 'Yes, visit My Profile to update your personal details anytime.'},
         {'q': 'How do I reset my password?', 'a': 'Click "Forgot Password" on the login page and follow the email instructions.'},
         {'q': 'Is my data secure?', 'a': 'Yes, we use secure encryption and do not share your data with third parties.'},

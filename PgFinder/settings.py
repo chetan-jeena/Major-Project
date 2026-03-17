@@ -163,6 +163,7 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 
 # Default from email
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@example.com')
+GOOGLE_MAPS_EMBED_API_KEY = env('GOOGLE_MAPS_EMBED_API_KEY', default='')
 
 # Choose email backend: if SMTP credentials provided, use SMTP backend; otherwise default to console backend
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
