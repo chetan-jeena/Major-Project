@@ -148,3 +148,108 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking by {self.tenant.username} for {self.pg.title}"
+
+
+class Rating(models.Model):
+    """
+    Star Rating Model for PG Listings (1-5 stars)
+    """
+    RATING_CHOICES = [
+        (1, "⭐ Poor"),
+        (2, "⭐⭐ Fair"),
+        (3, "⭐⭐⭐ Good"),
+        (4, "⭐⭐⭐⭐ Very Good"),
+        (5, "⭐⭐⭐⭐⭐ Excellent"),
+    ]
+
+    user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name="given_ratings")
+    pg = models.ForeignKey(PgListing, on_delete=models.CASCADE, related_name="ratings")
+    rating = models.IntegerField(choices=RATING_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "pg")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} rated {self.pg.title} - {self.rating}⭐"
+
+    def get_rating_display_name(self):
+        """Return the display name for the rating"""
+        return dict(self.RATING_CHOICES).get(self.rating, "Unknown")
+
+
+class Review(models.Model):
+    """
+    Review Model for PG Listings with star rating
+    """
+    user = models.ForeignKey(Users, on_delete=models.CASCADE, related_name="given_reviews")
+    pg = models.ForeignKey(PgListing, on_delete=models.CASCADE, related_name="reviews")
+    rating = models.ForeignKey(Rating, on_delete=models.CASCADE, related_name="review")
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    is_approved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        unique_together = ("user", "pg")
+
+    def __str__(self):
+        return f"Review by {self.user.username} for {self.pg.title}"
+
+
+class Payment(models.Model):
+    """
+    Payment Model for Razorpay Integration
+    Tracks all payment transactions for bookings
+    """
+    PAYMENT_STATUS_CHOICES = [
+        ("initiated", "Payment Initiated"),
+        ("pending", "Payment Pending"),
+        ("completed", "Payment Completed"),
+        ("failed", "Payment Failed"),
+        ("refunded", "Refunded"),
+    ]
+
+    PAYMENT_METHOD_CHOICES = [
+        ("razorpay", "Razorpay"),
+        ("upi", "UPI"),
+        ("card", "Card"),
+        ("other", "Other"),
+    ]
+
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name="payment")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    razorpay_order_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    razorpay_payment_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    razorpay_signature = models.CharField(max_length=255, blank=True, null=True)
+
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default="initiated"
+    )
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHOD_CHOICES,
+        default="razorpay"
+    )
+
+    transaction_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    error_message = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Payment for {self.booking} - {self.payment_status}"
+
+    def is_paid(self):
+        return self.payment_status == "completed"

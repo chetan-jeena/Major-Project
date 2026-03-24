@@ -1,6 +1,19 @@
 from django.urls import path
 
 from . import views
+from .search_views import (
+    advanced_search,
+    map_view,
+    get_map_markers,
+    quick_search,
+)
+from .payment_views import (
+    initiate_payment,
+    verify_payment,
+    razorpay_webhook,
+    payment_status,
+    refund_payment,
+)
 
 urlpatterns = [
     path("", views.pgs, name="pgs"),
@@ -19,5 +32,20 @@ urlpatterns = [
     path("review-visit/<int:visit_request_id>/", views.review_visit_request, name="review_visit_request"),
     path("my-bookings/", views.my_bookings_list, name="my_bookings_list"),
     path("cancel-booking/<int:booking_id>/", views.cancel_booking, name="cancel_booking"),
+
+    # Advanced Search & Filter
+    path('advanced-search/', advanced_search, name='advanced_search'),
+    path('map/', map_view, name='map_view'),
+    path('api/map-markers/', get_map_markers, name='get_map_markers'),
+    path('api/quick-search/', quick_search, name='quick_search'),
+
+    # Razorpay Payment URLs
+    path('payment/initiate/<int:booking_id>/', initiate_payment, name='initiate_payment'),
+    path('payment/verify/<int:booking_id>/', verify_payment, name='verify_payment'),
+    path('payment/webhook/', razorpay_webhook, name='razorpay_webhook'),
+    path('payment/status/<int:booking_id>/', payment_status, name='payment_status'),
+    path('payment/refund/<int:booking_id>/', refund_payment, name='refund_payment'),
+
     path("<slug:pg_slug>/", views.pg_detail, name="pg_detail"),
 ]
+

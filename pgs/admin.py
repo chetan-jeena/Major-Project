@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Booking, PGImage, PgListing, SavedPg, VisitRequest
+from .models import Booking, PGImage, PgListing, SavedPg, VisitRequest, Review, Rating, Payment
 
 
 @admin.register(PgListing)
@@ -48,3 +48,27 @@ class VisitRequestAdmin(admin.ModelAdmin):
     list_display = ("user", "pg", "preferred_date", "status", "created_at")
     list_filter = ("status", "preferred_date", "created_at")
     search_fields = ("user__email", "pg__title", "notes")
+
+
+@admin.register(Rating)
+class RatingAdmin(admin.ModelAdmin):
+    list_display = ("user", "pg", "rating", "created_at")
+    list_filter = ("rating", "created_at")
+    search_fields = ("user__email", "pg__title")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ("user", "pg", "title", "is_approved", "created_at")
+    list_filter = ("is_approved", "created_at")
+    search_fields = ("user__email", "pg__title", "title", "content")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ("booking", "amount", "payment_status", "payment_method", "created_at")
+    list_filter = ("payment_status", "payment_method", "created_at")
+    search_fields = ("booking__id", "razorpay_order_id", "razorpay_payment_id", "transaction_id")
+    readonly_fields = ("created_at", "updated_at", "completed_at")

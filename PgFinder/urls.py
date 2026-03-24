@@ -35,6 +35,7 @@ urlpatterns = [
     path('contact/', views.contact, name='contact'),
     path('user/', include('users.urls')),
     path('pgs/', include('pgs.urls')),
-    
+    path('chat/', include('chat.urls')),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

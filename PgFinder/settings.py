@@ -32,15 +32,18 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',  # Channels ASGI server
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',  # Django Channels
     'users',
     'pgs',
     'contact',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -71,7 +74,28 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'PgFinder.wsgi.application'
+WSGI_APPLICATION = 'PgFinder.asgi.application'
+
+# Channels Configuration
+ASGI_APPLICATION = 'PgFinder.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],  # Redis server (localhost for dev)
+        },
+    },
+}
+
+# Fallback to in-memory channel layer for development (no Redis required)
+# Uncomment below and comment above if Redis not available
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels.layers.InMemoryChannelLayer'
+#     }
+# }
+
 
 
 # Database
@@ -164,6 +188,10 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 # Default from email
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@example.com')
 GOOGLE_MAPS_EMBED_API_KEY = env('GOOGLE_MAPS_EMBED_API_KEY', default='')
+
+# Razorpay Configuration
+RAZORPAY_KEY_ID = env('RAZORPAY_KEY_ID', default='')
+RAZORPAY_KEY_SECRET = env('RAZORPAY_KEY_SECRET', default='')
 
 # Choose email backend: if SMTP credentials provided, use SMTP backend; otherwise default to console backend
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:

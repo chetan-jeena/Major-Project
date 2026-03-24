@@ -94,7 +94,56 @@ class MyUser(AbstractBaseUser):
 
     def has_perm(self, perm, obj=None):
         return self.is_admin
-    
+
     def has_module_perms(self,add_label):
         return True
-    
+
+
+class Notification(models.Model):
+    """
+    Notification Model for system notifications
+    Tracks booking confirmations, messages, payments, reviews, etc.
+    """
+    NOTIFICATION_TYPE_CHOICES = [
+        ("booking_confirmed", "Booking Confirmed"),
+        ("booking_pending", "Booking Pending"),
+        ("payment_success", "Payment Successful"),
+        ("payment_failed", "Payment Failed"),
+        ("new_message", "New Message"),
+        ("visit_request", "Visit Request"),
+        ("review_posted", "Review Posted"),
+        ("profile_update", "Profile Update"),
+    ]
+
+    user = models.ForeignKey(MyUser, on_delete=models.CASCADE, related_name="notifications")
+    notification_type = models.CharField(max_length=50, choices=NOTIFICATION_TYPE_CHOICES)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+
+    # Links to related objects (flexible, can be null)
+    booking_id = models.IntegerField(blank=True, null=True)
+    pg_id = models.IntegerField(blank=True, null=True)
+    user_from = models.ForeignKey(
+        MyUser,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="sent_notifications"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Notification for {self.user.email} - {self.notification_type}"
+
+    def mark_as_read(self):
+        """Mark notification as read"""
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save()
