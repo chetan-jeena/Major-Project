@@ -15,15 +15,14 @@
   .cta-row a { text-decoration:none; border-radius:12px; padding:.85rem 1rem; font-weight:700; }
   .primary { background:#1e88e5; color:white; }
   .secondary { background:#eef4fb; color:#1e1f3d; }
-  .qr-box { text-align:center; }
-  .qr-box img { max-width:280px; width:100%; border-radius:18px; background:white; padding:.8rem; }
+  .success-badge { background: #c8e6c9; color: #2e7d32; padding: 0.5rem 1rem; border-radius: 8px; display: inline-block; margin-bottom: 1rem; }
   @media (max-width: 800px) { .timeline, .detail-grid { grid-template-columns:1fr; } }
 </style>
 
 <section class="booking-shell">
   <div class="hero">
-    <h1>Booking in progress</h1>
-    <p>Your booking has been created. The next step is to submit your payment proof so the owner or admin can review it.</p>
+    <h1>Booking Confirmation</h1>
+    <p>Your booking has been created successfully. Complete the payment below to confirm your booking.</p>
     <div class="timeline">
       {% for step in timeline %}
         <div class="timeline-step {% if step.done %}done{% endif %}">
@@ -33,53 +32,70 @@
     </div>
   </div>
 
+  {% if request.GET.payment == "success" %}
+    <div class="panel">
+      <div class="success-badge">
+        <i class="fas fa-check-circle"></i> Payment Successful!
+      </div>
+      <h3>Your booking is now confirmed</h3>
+      <p>The owner has been notified about your booking. You should receive further instructions shortly.</p>
+    </div>
+  {% endif %}
+
   <div class="panel detail-grid">
     <div class="tile">
       <small>PG</small>
       <strong>{{ booking.pg.title }}</strong>
     </div>
     <div class="tile">
-      <small>Booking status</small>
+      <small>Booking Status</small>
       <strong>{{ booking.get_status_display }}</strong>
     </div>
     <div class="tile">
-      <small>Check-in date</small>
+      <small>Check-in Date</small>
       <strong>{{ booking.check_in_date|date:"d M Y" }}</strong>
     </div>
     <div class="tile">
-      <small>Amount</small>
+      <small>Payment Amount</small>
       <strong>₹{{ booking.amount }}/month</strong>
     </div>
+    {% if booking.payment %}
+      <div class="tile">
+        <small>Payment Status</small>
+        <strong>{{ booking.payment.get_payment_status_display }}</strong>
+      </div>
+    {% endif %}
     <div class="tile">
-      <small>Payment reference</small>
-      <strong>{{ booking.payment_reference|default:"Not submitted yet" }}</strong>
-    </div>
-    <div class="tile">
-      <small>Owner contact</small>
+      <small>Owner Contact</small>
       <strong>{{ booking.pg.owner.phone }} · {{ booking.pg.owner.email }}</strong>
     </div>
   </div>
 
-  <div class="panel qr-box">
-    <h2>Scan to pay</h2>
-    {% if qr_code_url %}
-      <img src="{{ qr_code_url }}" alt="Payment QR code">
-      <p>UPI ID: {{ booking.phonepe_upi }}</p>
-    {% else %}
-      <p>QR code is not available yet.</p>
-    {% endif %}
-    <div class="cta-row" style="justify-content:center;">
-      {% if booking.status == "pending" %}
-        <a class="primary" href="{% url 'confirm_payment' booking.id %}">Submit payment proof</a>
-      {% endif %}
-      <a class="secondary" href="{% url 'my_bookings_list' %}">View all bookings</a>
-      <a class="secondary" href="{% url 'pg_detail' booking.pg.slug %}">Back to PG details</a>
+  {% if booking.status == "pending" %}
+    <div class="panel">
+      <h2>Complete Your Payment</h2>
+      <p>Click the button below to proceed to UPI payment. You can pay using any UPI app like Google Pay, PhonePe, or BHIM.</p>
+      <div class="cta-row">
+        <a class="primary" href="{% url 'initiate_payment' booking.id %}">
+          <i class="fas fa-mobile-alt"></i> Proceed to UPI Payment
+        </a>
+      </div>
     </div>
+  {% elif booking.status == "confirmed" %}
+    <div class="panel alert alert-success">
+      <h3><i class="fas fa-check-circle"></i> Booking Confirmed!</h3>
+      <p>Your booking is now confirmed. The owner will contact you shortly with further details.</p>
+    </div>
+  {% endif %}
+
+  <div class="panel cta-row" style="justify-content:center;">
+    <a class="secondary" href="{% url 'my_bookings_list' %}">View All Bookings</a>
+    <a class="secondary" href="{% url 'pg_detail' booking.pg.slug %}">Back to PG Details</a>
   </div>
 
   {% if booking.review_notes %}
     <div class="panel">
-      <h3>Review notes</h3>
+      <h3>Review Notes</h3>
       <p>{{ booking.review_notes }}</p>
     </div>
   {% endif %}

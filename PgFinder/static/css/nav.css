@@ -5,6 +5,11 @@
     box-sizing: border-box;
 }
 
+/* Add top padding to body for fixed navbar */
+body {
+    padding-top: 70px;
+}
+
 /* Navbar styling */
 .navbar {
     background-color: #1e1e2f;
@@ -12,8 +17,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 80px;
+    padding: 15px 20px;
     font-family: 'Poppins', sans-serif;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* Logo section */
@@ -224,14 +235,16 @@
 
 /* Responsive (for mobile view) */
 @media (max-width: 768px) {
+    body {
+        padding-top: 80px;
+    }
+
     .navbar {
-        flex-direction: column;
-        padding: 20px;
+        flex-direction: row;
+        padding: 15px 10px;
     }
 
     .nav-links {
-        flex-direction: column;
-        gap: 15px;
-        margin-top: 15px;
+        display: none;
     }
 }

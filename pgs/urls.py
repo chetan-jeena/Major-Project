@@ -10,9 +10,8 @@ from .search_views import (
 from .payment_views import (
     initiate_payment,
     verify_payment,
-    razorpay_webhook,
-    payment_status,
-    refund_payment,
+    confirm_payment,
+    cancel_payment,
 )
 
 urlpatterns = [
@@ -39,12 +38,11 @@ urlpatterns = [
     path('api/map-markers/', get_map_markers, name='get_map_markers'),
     path('api/quick-search/', quick_search, name='quick_search'),
 
-    # Razorpay Payment URLs
+    # Direct UPI Payment URLs
     path('payment/initiate/<int:booking_id>/', initiate_payment, name='initiate_payment'),
     path('payment/verify/<int:booking_id>/', verify_payment, name='verify_payment'),
-    path('payment/webhook/', razorpay_webhook, name='razorpay_webhook'),
-    path('payment/status/<int:booking_id>/', payment_status, name='payment_status'),
-    path('payment/refund/<int:booking_id>/', refund_payment, name='refund_payment'),
+    path('payment/confirm/<int:booking_id>/', confirm_payment, name='confirm_payment'),
+    path('payment/cancel/<int:booking_id>/', cancel_payment, name='cancel_payment'),
 
     path("<slug:pg_slug>/", views.pg_detail, name="pg_detail"),
 ]

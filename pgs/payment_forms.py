@@ -2,24 +2,23 @@ from django import forms
 from .models import Payment, Booking
 
 
-class RazorpayPaymentForm(forms.ModelForm):
+class PhonePePaymentForm(forms.ModelForm):
     """
-    Form for handling Razorpay payments
-    This form is mainly for backend processing, frontend uses Razorpay SDK
+    Form for handling PhonePe UPI payments
+    This form is mainly for backend processing, frontend uses PhonePe API
     """
     class Meta:
         model = Payment
-        fields = ('razorpay_payment_id', 'razorpay_signature')
+        fields = ('phonepe_transaction_id', 'phonepe_response_code')
         widgets = {
-            'razorpay_payment_id': forms.HiddenInput(),
-            'razorpay_signature': forms.HiddenInput(),
+            'phonepe_transaction_id': forms.HiddenInput(),
+            'phonepe_response_code': forms.HiddenInput(),
         }
 
 
 class PaymentVerificationForm(forms.Form):
     """
-    Form to verify payment signatures from Razorpay webhook
+    Form to verify payment status from PhonePe
     """
-    razorpay_order_id = forms.CharField(max_length=100)
-    razorpay_payment_id = forms.CharField(max_length=100)
-    razorpay_signature = forms.CharField(max_length=255)
+    phonepe_order_id = forms.CharField(max_length=100)
+    phonepe_transaction_id = forms.CharField(max_length=100)

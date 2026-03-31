@@ -70,5 +70,5 @@ class ReviewAdmin(admin.ModelAdmin):
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ("booking", "amount", "payment_status", "payment_method", "created_at")
     list_filter = ("payment_status", "payment_method", "created_at")
-    search_fields = ("booking__id", "razorpay_order_id", "razorpay_payment_id", "transaction_id")
+    search_fields = ("booking__id", "transaction_id", "booking__tenant__email")
     readonly_fields = ("created_at", "updated_at", "completed_at")

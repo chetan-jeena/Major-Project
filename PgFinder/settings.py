@@ -10,23 +10,32 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+import environ
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-i+ntjimwi6zfxs5jr-rs004!-n1(zrvu1$_#0ygfug)j(3uhyd'
+SECRET_KEY = env(
+    'SECRET_KEY',
+    default='django-insecure-i+ntjimwi6zfxs5jr-rs004!-n1(zrvu1$_#0ygfug)j(3uhyd',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1','10.185.190.123'])
 
 
 # Application definition
@@ -79,22 +88,33 @@ WSGI_APPLICATION = 'PgFinder.asgi.application'
 # Channels Configuration
 ASGI_APPLICATION = 'PgFinder.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],  # Redis server (localhost for dev)
-        },
-    },
-}
+USE_REDIS = env.bool('USE_REDIS', default=False)
+REDIS_HOST = env('REDIS_HOST', default='127.0.0.1')
+REDIS_PORT = env.int('REDIS_PORT', default=6379)
+REDIS_DB = env.int('REDIS_DB', default=0)
+REDIS_PASSWORD = env('REDIS_PASSWORD', default='')
 
-# Fallback to in-memory channel layer for development (no Redis required)
-# Uncomment below and comment above if Redis not available
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels.layers.InMemoryChannelLayer'
-#     }
-# }
+if USE_REDIS:
+    redis_host = REDIS_HOST
+    if REDIS_PASSWORD:
+        redis_host = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+    else:
+        redis_host = (REDIS_HOST, REDIS_PORT)
+
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [redis_host],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
 
 
 
@@ -133,7 +153,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = env('TIME_ZONE', default='UTC')
 
 USE_I18N = True
 
@@ -172,12 +192,6 @@ MESSAGE_TAGS = {
 }
 
 
-import environ
-import os
-
-env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
-
 # SMTP configuration - read from environment (.env)
 EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = env.int('EMAIL_PORT', default=587)
@@ -189,9 +203,8 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@example.com')
 GOOGLE_MAPS_EMBED_API_KEY = env('GOOGLE_MAPS_EMBED_API_KEY', default='')
 
-# Razorpay Configuration
-RAZORPAY_KEY_ID = env('RAZORPAY_KEY_ID', default='')
-RAZORPAY_KEY_SECRET = env('RAZORPAY_KEY_SECRET', default='')
+# Direct UPI Payment Configuration
+YOUR_UPI_ID = env('YOUR_UPI_ID', default='9027448046@axl')
 
 # Choose email backend: if SMTP credentials provided, use SMTP backend; otherwise default to console backend
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
