@@ -327,7 +327,16 @@ def my_profile(request):
         messages.success(request, "Profile updated successfully!")
         return redirect('my_profile')
 
-    context = {'user_obj': user, 'page': 'profile'}
+    # Get booking counts for sidebar
+    pending_bookings_count = Booking.objects.filter(tenant=user, status='pending_payment_review').count()
+    confirmed_bookings_count = Booking.objects.filter(tenant=user, status='confirmed').count()
+
+    context = {
+        'user_obj': user,
+        'page': 'profile',
+        'pending_bookings_count': pending_bookings_count,
+        'confirmed_bookings_count': confirmed_bookings_count,
+    }
     return render(request, 'users/dashboard/my_profile.html', context)
 
 
@@ -432,7 +441,16 @@ def settings_view(request):
         messages.success(request, "Password changed successfully!")
         return redirect('settings')
 
-    context = {'user_obj': user, 'page': 'settings'}
+    # Get booking counts for sidebar
+    pending_bookings_count = Booking.objects.filter(tenant=user, status='pending_payment_review').count()
+    confirmed_bookings_count = Booking.objects.filter(tenant=user, status='confirmed').count()
+
+    context = {
+        'user_obj': user,
+        'page': 'settings',
+        'pending_bookings_count': pending_bookings_count,
+        'confirmed_bookings_count': confirmed_bookings_count,
+    }
     return render(request, 'users/dashboard/settings.html', context)
 
 
@@ -450,6 +468,15 @@ def help_support(request):
         {'q': 'Is my data secure?', 'a': 'Yes, we use secure encryption and do not share your data with third parties.'},
     ]
 
-    context = {'faqs': faqs, 'page': 'help'}
+    # Get booking counts for sidebar
+    pending_bookings_count = Booking.objects.filter(tenant=request.user, status='pending_payment_review').count()
+    confirmed_bookings_count = Booking.objects.filter(tenant=request.user, status='confirmed').count()
+
+    context = {
+        'faqs': faqs,
+        'page': 'help',
+        'pending_bookings_count': pending_bookings_count,
+        'confirmed_bookings_count': confirmed_bookings_count,
+    }
     return render(request, 'users/dashboard/help_support.html', context)
 

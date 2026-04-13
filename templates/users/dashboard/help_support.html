@@ -3,52 +3,81 @@
 
 {% block content %}
 <style>
+  * {
+    box-sizing: border-box;
+  }
+
   .dashboard-container {
     display: flex;
     min-height: 100vh;
-    background: #f5f7fa;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
   }
 
   .sidebar {
-    width: 250px;
+    width: 280px;
     background: linear-gradient(135deg, #1e1f3d 0%, #2d2e4f 100%);
     color: white;
-    padding: 30px 0;
+    padding: 25px 0;
     position: fixed;
     height: 100vh;
     overflow-y: auto;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,212,255,0.3) transparent;
+  }
+
+  .sidebar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sidebar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sidebar::-webkit-scrollbar-thumb {
+    background: rgba(0,212,255,0.3);
+    border-radius: 3px;
   }
 
   .sidebar-header {
-    padding: 0 20px 30px;
+    padding: 0 25px 25px 25px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
-    margin-bottom: 20px;
+    margin-bottom: 25px;
     text-align: center;
   }
 
   .sidebar-avatar {
-    width: 80px;
-    height: 80px;
+    width: 90px;
+    height: 90px;
     border-radius: 50%;
-    border: 3px solid #00d4ff;
+    border: 4px solid #00d4ff;
     object-fit: cover;
-    margin: 0 auto 15px;
+    margin: 0 auto 18px;
     display: block;
+    box-shadow: 0 4px 16px rgba(0,212,255,0.4);
   }
 
   .sidebar-name {
     font-weight: 700;
-    font-size: 1rem;
-    margin: 10px 0 5px;
+    font-size: 1.1rem;
+    margin: 12px 0 8px;
+    text-transform: capitalize;
+    word-break: break-word;
+    line-height: 1.3;
   }
 
   .sidebar-email {
-    font-size: 0.85rem;
-    opacity: 0.8;
+    font-size: 0.75rem;
+    opacity: 0.75;
+    word-break: break-all;
+    line-height: 1.4;
   }
 
   .sidebar-menu {
     list-style: none;
+    padding: 0;
+    margin: 0;
   }
 
   .sidebar-menu li {
@@ -59,126 +88,193 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 20px;
+    padding: 14px 25px;
     color: rgba(255,255,255,0.8);
     text-decoration: none;
-    transition: all 0.3s;
-    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+    font-size: 15px;
+    font-weight: 500;
+    gap: 10px;
   }
 
   .sidebar-menu a:hover,
   .sidebar-menu a.active {
-    background: rgba(0,212,255,0.1);
+    background: rgba(0,212,255,0.15);
     color: #00d4ff;
     border-left-color: #00d4ff;
+    padding-left: 23px;
   }
 
   .badge {
     display: inline-block;
-    background: #ffc107;
-    color: #333;
-    padding: 2px 8px;
+    background: #ff9800;
+    color: white;
+    padding: 3px 10px;
     border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: 600;
+    font-size: 0.65rem;
+    font-weight: 700;
   }
 
   .badge.confirmed {
-    background: #28a745;
-    color: white;
+    background: #4caf50;
   }
 
   .main-content {
-    margin-left: 250px;
+    margin-left: 280px;
     flex: 1;
-    padding: 30px;
+    padding: 40px;
   }
 
   .content-header {
     background: white;
-    padding: 25px;
-    border-radius: 10px;
-    margin-bottom: 30px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding: 30px;
+    border-radius: 12px;
+    margin-bottom: 35px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border-left: 5px solid #00d4ff;
   }
 
   .content-header h2 {
     margin: 0;
-    font-size: 28px;
+    font-size: 32px;
     color: #1e1f3d;
+    font-weight: 700;
   }
 
   .card {
     background: white;
-    border-radius: 10px;
-    padding: 30px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    margin-bottom: 20px;
+    border-radius: 12px;
+    padding: 35px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    margin-bottom: 25px;
+    transition: box-shadow 0.3s ease;
+  }
+
+  .card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+
+  .faq-container {
+    max-width: 100%;
   }
 
   .faq-item {
-    margin-bottom: 20px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #eee;
+    margin-bottom: 0;
+    border-bottom: 2px solid #f0f0f0;
+    transition: all 0.3s ease;
   }
 
   .faq-item:last-child {
     border-bottom: none;
   }
 
+  .faq-item.active .faq-q {
+    color: #00d4ff;
+  }
+
+  .faq-item.active .faq-icon {
+    transform: rotate(45deg);
+  }
+
   .faq-q {
     font-weight: 700;
     color: #1e1f3d;
     font-size: 16px;
-    margin-bottom: 10px;
+    padding: 18px 0;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: all 0.3s ease;
+    user-select: none;
   }
 
   .faq-q:hover {
     color: #00d4ff;
   }
 
-  .faq-a {
-    color: #666;
-    line-height: 1.6;
-    display: none;
+  .faq-icon {
+    font-size: 24px;
+    transition: transform 0.3s ease;
+    color: #00d4ff;
   }
 
-  .faq-a.show {
-    display: block;
+  .faq-a {
+    color: #666;
+    line-height: 1.8;
+    font-size: 15px;
+    max-height: 0;
+    overflow: hidden;
+    padding: 0;
+    transition: all 0.3s ease;
+  }
+
+  .faq-item.active .faq-a {
+    max-height: 500px;
+    padding: 0 0 18px 0;
   }
 
   .contact-section {
     background: linear-gradient(135deg, #1e1f3d 0%, #2d2e4f 100%);
     color: white;
-    padding: 30px;
-    border-radius: 10px;
+    padding: 40px;
+    border-radius: 12px;
     margin-top: 30px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
   }
 
   .contact-section h3 {
     margin-top: 0;
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+
+  .contact-section p {
+    opacity: 0.9;
+    margin-bottom: 30px;
+    font-size: 15px;
+  }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 30px;
   }
 
   .contact-item {
-    margin: 15px 0;
+    text-align: center;
+  }
+
+  .contact-item-icon {
+    font-size: 32px;
+    margin-bottom: 15px;
   }
 
   .contact-item strong {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
+    font-size: 16px;
   }
 
-  .contact-item a {
+  .contact-item a,
+  .contact-item p {
     color: #00d4ff;
     text-decoration: none;
+    font-size: 14px;
+    transition: all 0.3s ease;
   }
 
   .contact-item a:hover {
     text-decoration: underline;
+    color: #ffffff;
+  }
+
+  .faq-header {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 25px 0;
+    color: #1e1f3d;
   }
 
   @media (max-width: 768px) {
@@ -190,11 +286,42 @@
       position: static;
       width: 100%;
       height: auto;
+      padding: 20px 0;
     }
 
     .main-content {
       margin-left: 0;
-      padding: 15px;
+      padding: 20px;
+    }
+
+    .content-header {
+      padding: 20px;
+    }
+
+    .content-header h2 {
+      font-size: 24px;
+    }
+
+    .card {
+      padding: 20px;
+    }
+
+    .contact-grid {
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    .contact-item {
+      text-align: left;
+    }
+
+    .faq-q {
+      font-size: 15px;
+      padding: 14px 0;
+    }
+
+    .contact-section {
+      padding: 25px;
     }
   }
 </style>
@@ -234,42 +361,54 @@
   <!-- MAIN CONTENT -->
   <main class="main-content">
     <div class="content-header">
-      <h2>Help & Support</h2>
+      <h2>❓ Help & Support</h2>
     </div>
 
+    <!-- FAQ SECTION -->
     <div class="card">
-      <h3 style="margin-top: 0; color: #1e1f3d;">Frequently Asked Questions</h3>
+      <h3 class="faq-header">Frequently Asked Questions</h3>
 
-      {% for faq in faqs %}
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">
-            <span>{{ faq.q }}</span>
-            <span style="font-size: 20px;">+</span>
+      <div class="faq-container">
+        {% for faq in faqs %}
+          <div class="faq-item">
+            <div class="faq-q" onclick="toggleFAQ(this)">
+              <span>{{ faq.q }}</span>
+              <span class="faq-icon">+</span>
+            </div>
+            <div class="faq-a">
+              {{ faq.a }}
+            </div>
           </div>
-          <div class="faq-a">
-            {{ faq.a }}
-          </div>
-        </div>
-      {% endfor %}
+        {% endfor %}
+      </div>
     </div>
 
+    <!-- CONTACT SECTION -->
     <div class="card contact-section">
-      <h3>Need More Help?</h3>
-      <p>We're here to help! If you have any questions or issues, feel free to contact us:</p>
-      
-      <div class="contact-item">
-        <strong>Email:</strong>
-        <a href="mailto:support@e-hostelpg.com">support@e-hostelpg.com</a>
-      </div>
-      
-      <div class="contact-item">
-        <strong>Phone:</strong>
-        <a href="tel:+919876543210">+91 9876 543 210</a>
-      </div>
-      
-      <div class="contact-item">
-        <strong>Live Chat:</strong>
-        <p>Available Monday - Friday, 9AM - 6PM IST</p>
+      <h3>📞 Need More Help?</h3>
+      <p>We're here to support you! If you have any questions or issues, feel free to reach out to us through any of these channels:</p>
+
+      <div class="contact-grid">
+        <div class="contact-item">
+          <div class="contact-item-icon">📧</div>
+          <strong>Email Support</strong>
+          <a href="mailto:support@e-hostelpg.com">support@e-hostelpg.com</a>
+          <p style="color: rgba(255,255,255,0.7); margin-top: 8px; font-size: 12px;">Response within 24 hours</p>
+        </div>
+
+        <div class="contact-item">
+          <div class="contact-item-icon">📱</div>
+          <strong>Call Us</strong>
+          <a href="tel:+919876543210">+91 9876 543 210</a>
+          <p style="color: rgba(255,255,255,0.7); margin-top: 8px; font-size: 12px;">Mon - Fri, 9AM - 6PM IST</p>
+        </div>
+
+        <div class="contact-item">
+          <div class="contact-item-icon">💬</div>
+          <strong>Live Chat</strong>
+          <p>Available on our platform</p>
+          <p style="color: rgba(255,255,255,0.7); margin-top: 8px; font-size: 12px;">Mon - Fri, 9AM - 6PM IST</p>
+        </div>
       </div>
     </div>
   </main>
@@ -277,11 +416,18 @@
 
 <script>
   function toggleFAQ(element) {
-    const answer = element.nextElementSibling;
-    const icon = element.querySelector('span:last-child');
-    
-    answer.classList.toggle('show');
-    icon.textContent = answer.classList.contains('show') ? '−' : '+';
+    const faqItem = element.parentElement;
+    const isActive = faqItem.classList.contains('active');
+
+    // Close all other FAQs
+    document.querySelectorAll('.faq-item').forEach(item => {
+      item.classList.remove('active');
+    });
+
+    // Toggle current FAQ
+    if (!isActive) {
+      faqItem.classList.add('active');
+    }
   }
 </script>
 

@@ -35,7 +35,7 @@ SECRET_KEY = env(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1','10.185.190.123'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1','10.109.22.123'])
 
 
 # Application definition
@@ -184,6 +184,10 @@ AUTHENTICATION_BACKENDS = [
     'users.backends.EmailOrUsernameModelBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+# Google Maps API
+GOOGLE_MAPS_API_KEY = 'AIzaSyCHo7pqR0kLhEnj45k6UKFW5q3dJK1mFZk'
+GOOGLE_MAPS_EMBED_API_KEY = 'AIzaSyCHo7pqR0kLhEnj45k6UKFW5q3dJK1mFZk'
 
 from django.contrib.messages import constants as messages
 MESSAGE_TAGS = {
