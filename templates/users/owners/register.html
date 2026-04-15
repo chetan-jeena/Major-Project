@@ -22,7 +22,9 @@
                     </div>
                     {% include 'includes/alert.html' %}
                     <div class="card-body p-4">
+                        {% block form_action %}
                         <form action="{% url 'owner_register' %}" id="registrationForm"  method="POST" enctype="multipart/form-data">
+                            {% endblock %}
                             {% csrf_token %}
                             <!-- Reorganized form into 3 columns for better horizontal space utilization -->
                             <div class="row">
